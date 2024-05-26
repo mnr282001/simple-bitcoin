@@ -4,6 +4,7 @@ from textwrap import dedent
 from time import time
 from uuid import uuid4
 from flask import Flask, jsonify, request
+import logging
 
 
 class Blockchain(object):
@@ -110,6 +111,7 @@ class Blockchain(object):
 
 # Instantiate our Node
 app = Flask(__name__)
+logging.basicConfig(level=logging.DEBUG)
 
 # Generate a globally unique address for this node
 node_identifier = str(uuid4()).replace('-', '')
@@ -147,21 +149,31 @@ def mine():
     return jsonify(response), 200
 
 
-@app.route('transactions/new', methods=['POST'])
+@app.route('/transactions/new', methods=['POST'])
 def new_transaction():
-    values = request.get_json()
+    try:
+        # Log the raw data of the request
+        app.logger.debug(f'Request data: {request.data}')
+        app.logger.debug(f'Request headers: {request.headers}')
 
-    # Check that the required fields are in the POST'ed data
-    required = ['sender', 'recipient', 'amount']
-    if not all(k in values for k in required):
-        return 'Missing Values', 400
+        values = request.get_json()
+        app.logger.debug(f'Parsed JSON: {values}')
 
-    # Creates a new Transaction
-    index = blockchain.new_transaction(
-        values['sender'], values['recipient'], values['amount'])
+        # Check that the required fields are in the POST'ed data
+        required = ['sender', 'recipient', 'amount']
+        if not all(k in values for k in required):
+            return 'Missing Values', 400
 
-    response = {'message': f'Transaction will be added to Block {index}'}
-    return jsonify(response), 201
+        # Creates a new Transaction
+        index = blockchain.new_transaction(
+            values['sender'], values['recipient'], values['amount'])
+
+        response = {'message': f'Transaction will be added to Block {index}'}
+        return jsonify(response), 201
+
+    except Exception as e:
+        app.logger.error(f'Error processing request: {e}')
+        return 'Internal Server Error', 500
 
 
 @app.route('/chain', methods=['GET'])
@@ -174,4 +186,4 @@ def full_chain():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5001)
